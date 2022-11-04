@@ -1,5 +1,248 @@
 # Changelog
 
+## Thrust 2.0.0
+
+### Summary
+
+The Thrust 2.0.0 major release adds a dependency on libcu++ and contains several
+breaking changes. These include new diagnostics when inspecting device-only
+lambdas from the host, removal of the `cub` symlink in the Thrust repository
+root, and removal of the deprecated `THRUST_*_BACKEND` macros. It also includes
+several minor bugfixes and cleanups.
+
+### Breaking Changes
+
+- NVIDIA/thrust#1605: Add libcu++ dependency.
+    - A suitable version of libcu++ is provided through
+      the `${THRUST_ROOT}/dependencies/libcudacxx/` submodule.
+    - Non-cmake users may need to add the libcu++ include path to their
+      builds (`-I ${THRUST_ROOT}/dependencies/libcudacxx/include/`).
+    - The Thrust CMake packages have been updated to add this include path.
+- NVIDIA/thrust#1605: The following macros are no longer defined by default.
+  They can be re-enabled by defining `THRUST_PROVIDE_LEGACY_ARCH_MACROS`. These
+  will be removed completely in a future release.
+    - `THRUST_IS_HOST_CODE`: Replace with `NV_IF_TARGET`.
+    - `THRUST_IS_DEVICE_CODE`: Replace with `NV_IF_TARGET`.
+    - `THRUST_INCLUDE_HOST_CODE`: Replace with `NV_IF_TARGET`.
+    - `THRUST_INCLUDE_DEVICE_CODE`: Replace with `NV_IF_TARGET`.
+    - `THRUST_DEVICE_CODE`: Replace with `NV_IF_TARGET`.
+- NVIDIA/thrust#1661: Thrust’s CUDA Runtime support macros have been updated to
+  support `NV_IF_TARGET`. They are now defined consistently across all
+  host/device compilation passes. This should not affect most usages of these
+  macros, but may require changes for some edge cases.
+    - `THRUST_RUNTIME_FUNCTION`: Execution space annotations for functions that
+      invoke CUDA Runtime APIs.
+        - Old behavior:
+            - RDC enabled: Defined to `__host__ __device__`
+            - RDC not enabled:
+                - NVCC host pass: Defined to `__host__ __device__`
+                - NVCC device pass: Defined to `__host__`
+        - New behavior:
+            - RDC enabled: Defined to `__host__ __device__`
+            - RDC not enabled: Defined to `__host__`
+    - `__THRUST_HAS_CUDART__`: No change in behavior, but no longer used in
+      Thrust. Provided for legacy support only. Legacy behavior:
+        - RDC enabled: Defined to 1.
+        - RDC not enabled:
+            - NVCC host pass: Defined to 1.
+            - NVCC device pass: Defined to 0.
+    - `THRUST_RDC_ENABLED`: New macro, may be combined with `NV_IF_TARGET` to
+      replace most usages of `__THRUST_HAS_CUDART__`. Behavior:
+        - RDC enabled: Macro is defined.
+        - RDC not enabled: Macro is not defined.
+- NVIDIA/thrust#1701: Remove the `cub` symlink from the root of the Thrust
+  repository.
+    - This symlink caused issues in certain build environments (e.g.
+      NVIDIA/thrust#1328).
+    - Builds that relied on this symlink will need to add the full CUB include
+      path (`-I ${THRUST_ROOT}/dependencies/cub`).
+    - CMake builds that use the Thrust packages via CPM, `add_subdirectory`,
+      or `find_package` are not affected.
+- NVIDIA/thrust#1760: A compile-time error is now emitted when a `__device__`
+  -only lambda’s return type is queried from host code (requires libcu++ ≥
+  1.9.0).
+    - Due to limitations in the CUDA programming model, the result of this query
+      is unreliable, and will silently return an incorrect result. This leads to
+      difficult to debug errors.
+    - When using libcu++ 1.9.0, an error will be emitted with information about
+      work-arounds:
+        - Use a named function object with a `__device__`-only implementation
+          of `operator()`.
+        - Use a `__host__ __device__` lambda.
+        - Use `cuda::proclaim_return_type` (Added in libcu++ 1.9.0)
+- NVIDIA/thrust#1761: Removed support for deprecated `THRUST_DEVICE_BACKEND`
+  and `THRUST_HOST_BACKEND` macros. The `THRUST_DEVICE_SYSTEM`
+  and `THRUST_HOST_SYSTEM` macros should be used instead.
+
+### Bug Fixes
+
+- NVIDIA/thrust#1605: Fix some execution space warnings in the allocator
+  library.
+- NVIDIA/thrust#1683: Fix bug in `iterator_category_to_traversal` metafunctions.
+- NVIDIA/thrust#1715: Add missing `__thrust_exec_check_disable__` annotation
+  to `thrust::make_zip_function`. Thanks to @mfbalin for this contribution.
+- NVIDIA/thrust#1722: Remove CUDA-specific error handler from code that may be
+  executed on non-CUDA backends. Thanks to @dkolsen-pgi for this contribution.
+- NVIDIA/thrust#1756: Fix `copy_if` for output iterators that don’t support copy
+  assignment. Thanks for @mfbalin for this contribution.
+
+### Other Enhancements
+
+- NVIDIA/thrust#1605: Removed special case code for unsupported CUDA
+  architectures.
+- NVIDIA/thrust#1605: Replace several usages of `__CUDA_ARCH__`
+  with `<nv/target>` to handle host/device code divergence.
+- NVIDIA/thrust#1752: Remove a leftover merge conflict from a documentation
+  file. Thanks to @tabedzki for this contribution.
+
+## Thrust 1.17.2
+
+### Summary
+
+Thrust 1.17.2 is a minor bugfix release that provides an updated version of CUB.
+
+## Thrust 1.17.1
+
+### Summary
+
+Thrust 1.17.1 is a minor bugfix release that provides an updated version of CUB.
+
+## Thrust 1.17.0
+
+### Summary
+
+Thrust 1.17.0 is the final minor release of the 1.X series. This release
+provides GDB pretty-printers for device vectors/references, a new `unique_count`
+algorithm, and an easier way to create tagged Thrust iterators. Several
+documentation fixes are included, which can be found on the new Thrust
+documentation site at https://nvidia.github.io/thrust. We'll be migrating
+existing documentation sources to this new location over the next few months.
+
+### New Features
+
+- NVIDIA/thrust#1586: Add new `thrust::make_tagged_iterator` convenience
+  function. Thanks to @karthikeyann for this contribution.
+- NVIDIA/thrust#1619: Add `unique_count` algorithm. Thanks to @upsj for this
+  contribution.
+- NVIDIA/thrust#1631: Add GDB pretty-printers for device vectors/references
+  to `scripts/gdb-pretty-printers.py`. Thanks to @upsj for this contribution.
+
+### Bug Fixes
+
+- NVIDIA/thrust#1671: Fixed `reduce_by_key` when called with 2^31 elements.
+
+### Other Enhancements
+
+- NVIDIA/thrust#1512: Use CUB to implement `adjacent_difference`.
+- NVIDIA/thrust#1555: Use CUB to implement `scan_by_key`.
+- NVIDIA/thrust#1611: Add new doxybook-based Thrust documentation
+  at https://nvidia.github.io/thrust.
+- NVIDIA/thrust#1639: Fixed broken link in documentation. Thanks to @jrhemstad
+  for this contribution.
+- NVIDIA/thrust#1644: Increase contrast of search input text in new doc site.
+  Thanks to @bdice for this contribution.
+- NVIDIA/thrust#1647: Add `__forceinline__` annotations to a functor wrapper.
+  Thanks to @mkuron for this contribution.
+- NVIDIA/thrust#1660: Fixed typo in documentation example for
+  `permutation_iterator`.
+- NVIDIA/thrust#1669: Add a new `explicit_cuda_stream.cu` example that shows how
+  to use explicit CUDA streams and `par`/`par_nosync` execution policies.
+
+## Thrust 1.16.0
+
+### Summary
+
+Thrust 1.16.0 provides a new “nosync” hint for the CUDA backend, as well as
+numerous bugfixes and stability improvements.
+
+#### New `thrust::cuda::par_nosync` Execution Policy
+
+Most of Thrust’s parallel algorithms are fully synchronous and will block the
+calling CPU thread until all work is completed. This design avoids many pitfalls
+associated with asynchronous GPU programming, resulting in simpler and
+less-error prone usage for new CUDA developers. Unfortunately, this improvement
+in user experience comes at a performance cost that often frustrates more
+experienced CUDA programmers.
+
+Prior to this release, the only synchronous-to-asynchronous migration path for
+existing Thrust codebases involved significant refactoring, replacing calls
+to `thrust` algorithms with a limited set of `future`-based `thrust::async`
+algorithms or lower-level CUB kernels. The new `thrust::cuda::par_nosync`
+execution policy provides a new, less-invasive entry point for asynchronous
+computation.
+
+`par_nosync` is a hint to the Thrust execution engine that any non-essential
+internal synchronizations should be skipped and that an explicit synchronization
+will be performed by the caller before accessing results.
+
+While some Thrust algorithms require internal synchronization to safely compute
+their results, many do not. For example, multiple `thrust::for_each` invocations
+can be launched without waiting for earlier calls to complete:
+
+```cpp
+// Queue three `for_each` kernels:
+thrust::for_each(thrust::cuda::par_nosync, vec1.begin(), vec1.end(), Op{});
+thrust::for_each(thrust::cuda::par_nosync, vec2.begin(), vec2.end(), Op{});
+thrust::for_each(thrust::cuda::par_nosync, vec3.begin(), vec3.end(), Op{});
+
+// Do other work while kernels execute:
+do_something();
+
+// Must explictly synchronize before accessing `for_each` results:
+cudaDeviceSynchronize();
+```
+
+Thanks to @fkallen for this contribution.
+
+### Deprecation Notices
+
+#### CUDA Dynamic Parallelism Support
+
+**A future version of Thrust will remove support for CUDA Dynamic Parallelism
+(CDP).**
+
+This will only affect calls to Thrust algorithms made from CUDA device-side code
+that currently launches a kernel; such calls will instead execute sequentially
+on the calling GPU thread instead of launching a device-wide kernel.
+
+### Breaking Changes
+
+- Thrust 1.14.0 included a change that aliased the `cub` namespace
+  to `thrust::cub`. This has caused issues with ambiguous namespaces for
+  projects that declare `using namespace thrust;` from the global namespace. We
+  recommend against this practice.
+- NVIDIA/thrust#1572: Removed several unnecessary header includes. Downstream
+  projects may need to update their includes if they were relying on this
+  behavior.
+
+### New Features
+
+- NVIDIA/thrust#1568: Add `thrust::cuda::par_nosync` policy. Thanks to @fkallen
+  for this contribution.
+
+### Enhancements
+
+- NVIDIA/thrust#1511: Use CUB’s new `DeviceMergeSort` API and remove Thrust’s
+  internal implementation.
+- NVIDIA/thrust#1566: Improved performance of `thrust::shuffle`. Thanks to
+  @djns99 for this contribution.
+- NVIDIA/thrust#1584: Support user-defined `CMAKE_INSTALL_INCLUDEDIR` values in
+  Thrust’s CMake install rules. Thanks to @robertmaynard for this contribution.
+
+### Bug Fixes
+
+- NVIDIA/thrust#1496: Fix some issues affecting `icc` builds.
+- NVIDIA/thrust#1552: Fix some collisions with the `min`/`max`  macros defined
+  in `windows.h`.
+- NVIDIA/thrust#1582: Fix issue with function type alias on 32-bit MSVC builds.
+- NVIDIA/thrust#1591: Workaround issue affecting compilation with `nvc++`.
+- NVIDIA/thrust#1597: Fix some collisions with the `small` macro defined
+  in `windows.h`.
+- NVIDIA/thrust#1599, NVIDIA/thrust#1603: Fix some issues with version handling
+  in Thrust’s CMake packages.
+- NVIDIA/thrust#1614: Clarify that scan algorithm results are non-deterministic
+  for pseudo-associative operators (e.g. floating-point addition).
+
 ## Thrust 1.15.0
 
 ### Summary
@@ -50,6 +293,13 @@ Several bugfixes are also included: The `tuple_size` and `tuple_element` helpers
 now support cv-qualified types. `scan_by_key` uses less memory.
 `thrust::iterator_traits` is better integrated with `std::iterator_traits`.
 See below for more details and references.
+
+### Breaking Changes
+
+- Thrust 1.14.0 included a change that aliased the `cub` namespace
+  to `thrust::cub`. This has caused issues with ambiguous namespaces for
+  projects that declare `using namespace thrust;` from the global namespace. We
+  recommend against this practice.
 
 ### New Features
 
